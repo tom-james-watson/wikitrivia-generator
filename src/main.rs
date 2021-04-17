@@ -1,5 +1,8 @@
+use io::Write;
 use regex::Regex;
 use reqwest::blocking::Client;
+use reqwest::header::USER_AGENT;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -14,6 +17,7 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
+#[derive(Serialize)]
 struct Item {
     id: String,
     label: String,
@@ -23,7 +27,7 @@ struct Item {
     date_prop_id: String,
     wikipedia: String,
     num_sitelinks: usize,
-    content_length: usize,
+    page_views: usize,
     instance_of: Option<Vec<String>>,
 }
 
@@ -35,43 +39,179 @@ fn first_letter_to_uppper_case(s1: String) -> String {
     }
 }
 
-fn get_content_length(wikipedia: &str, client: &Client) -> Option<usize> {
-    // Courtesy light rate limiting
-    thread::sleep(time::Duration::from_millis(100));
+#[derive(Serialize, Deserialize)]
+struct Items {
+    project: String,
+    article: String,
+    granularity: String,
+    timestamp: String,
+    access: String,
+    agent: String,
+    views: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PageViewsResult {
+    items: Vec<Items>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Label {
+    language: String,
+    value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct EntityData {
+    #[serde(rename = "type")]
+    entity_type: String,
+    id: String,
+    labels: HashMap<String, Label>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct EntitiesResult {
+    entities: HashMap<String, EntityData>,
+}
+
+fn get_page_views(wikipedia: &str, client: &Client) -> Option<usize> {
+    // thread::sleep(time::Duration::from_millis(100));
 
     let res = client
-        .head(format!(
-            "https://en.wikipedia.org/wiki/{}",
+        .get(format!(
+            "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{}/monthly/2021010100/2021020100",
             wikipedia.replace(" ", "_")
         ))
+        .header(USER_AGENT, "wiki-game analysis by wiki-game@tomjwatson.com")
         .send();
 
     if res.is_err() {
+        println!("Got an error from page views API");
         dbg!(&res);
         return None;
     }
 
     let res = res.unwrap();
-    let content_length = &res.headers().get("content-length");
 
-    if content_length.is_none() {
-        println!("No content-length header");
+    if res.status() == 429 {
+        println!("Rate limited by page views API, waiting 30 seconds");
+        thread::sleep(time::Duration::from_secs(30));
+    }
+
+    let json = res.json::<PageViewsResult>();
+
+    if json.is_err() {
+        println!("Can't parse page views results");
         return None;
     }
 
-    let content_length = content_length.unwrap().to_str().unwrap().parse::<usize>();
+    let json = json.unwrap();
 
-    if content_length.is_err() {
-        dbg!(&content_length);
+    if json.items.len() == 0 {
+        println!("Empty items returned from page views API");
         return None;
     }
 
-    Some(content_length.unwrap())
+    return Some(json.items[0].views);
 }
+
+fn get_item_label(
+    id: &str,
+    id_label_map: &mut HashMap<String, String>,
+    client: &Client,
+) -> Option<String> {
+    if let Some(label) = id_label_map.get(id) {
+        return Some(label.to_string());
+    }
+
+    let res = client
+        .get(format!(
+            "https://www.wikidata.org/w/api.php?action=wbgetentities&props=labels&ids={}&languages=en&format=json",
+            id
+        ))
+        .header(USER_AGENT, "wiki-game analysis by wiki-game@tomjwatson.com")
+        .send();
+
+    if res.is_err() {
+        println!("Got an error from wikidata API");
+        dbg!(&res);
+        return None;
+    }
+
+    let res = res.unwrap();
+
+    if res.status() == 429 {
+        println!("Rate limited by wikidata API, waiting 30 seconds");
+        thread::sleep(time::Duration::from_secs(30));
+    }
+
+    let json = res.json::<EntitiesResult>();
+
+    if json.is_err() {
+        println!("Can't parse wikidata results");
+        return None;
+    }
+
+    let json = json.unwrap();
+
+    let entity = json.entities.get(id);
+
+    if entity.is_none() {
+        println!("Couldn't find entity in wikidata results");
+        return None;
+    }
+
+    let label = entity.unwrap().labels.get("en");
+
+    if label.is_none() {
+        println!("Couldn't find en label in wikidata results");
+        return None;
+    }
+
+    let label = label.unwrap().value.to_string();
+
+    id_label_map.insert(id.to_string(), label.to_string());
+
+    return Some(label);
+}
+
+// fn get_content_length(wikipedia: &str, client: &Client) -> Option<usize> {
+//     let res = client
+//         .head(format!(
+//             "https://en.wikipedia.org/wiki/{}",
+//             wikipedia.replace(" ", "_")
+//         ))
+//         .header(USER_AGENT, "wiki-game analysis by tom@tomjwatson.com")
+//         .send();
+//
+//     if res.is_err() {
+//         dbg!(&res);
+//         return None;
+//     }
+//
+//     let res = res.unwrap();
+//     let content_length = &res.headers().get("content-length");
+//
+//     if content_length.is_none() {
+//         dbg!(res);
+//         println!("No content-length header");
+//         return None;
+//     }
+//
+//     let content_length = content_length.unwrap().to_str().unwrap().parse::<usize>();
+//
+//     if content_length.is_err() {
+//         dbg!(&content_length);
+//         return None;
+//     }
+//
+//     Some(content_length.unwrap())
+// }
 
 fn process_item_json(
     item_json: &str,
     date_props: &HashMap<&str, &str>,
+    id_label_map: &mut HashMap<String, String>,
     client: &Client,
 ) -> Option<Item> {
     // println!("\n---------------------------------------------\n");
@@ -88,8 +228,6 @@ fn process_item_json(
     }
 
     let label = label.unwrap().as_str().unwrap().to_string();
-
-    // println!("{}", &label);
 
     let wikipedia = v["sitelinks"]["enwiki"].as_str();
 
@@ -177,6 +315,7 @@ fn process_item_json(
         r"list of",
         // Uninteresting
         r"airport",
+        r"flag of",
     ];
 
     for re in label_blocklist_res.iter() {
@@ -238,41 +377,52 @@ fn process_item_json(
     let instance_of: Option<Vec<String>> = match v["claims"]["P31"].as_array() {
         Some(ids) => Some(
             ids.into_iter()
-                .map(|id| id.as_str().unwrap().to_string())
+                .map(|id| return get_item_label(id.as_str().unwrap(), id_label_map, &client))
+                .filter(|label_option| return label_option.is_some())
+                .map(|label_option| return label_option.unwrap())
                 .collect(),
         ),
         _ => None,
     };
 
+    if instance_of.is_some() {
+        if instance_of
+            .clone()
+            .unwrap()
+            .contains(&String::from("Q16521"))
+        {
+            // println!("Ignore taxon instances");
+            return None;
+        }
+    }
+
     let num_sitelinks = v["sitelinks"].as_object().unwrap().keys().len();
 
-    if num_sitelinks < 20 {
+    if num_sitelinks < 15 {
         // println!("Not enough sitelinks");
         return None;
     }
 
-    let content_length = get_content_length(&wikipedia, client);
+    let page_views = get_page_views(&wikipedia, client);
 
-    if content_length.is_none() {
+    if page_views.is_none() {
         println!(
-            "Can't fetch content length (https://en.wikipedia.org/wiki/{})",
+            "Can't fetch page views (https://en.wikipedia.org/wiki/{})",
             wikipedia.replace(" ", "_")
         );
         return None;
     }
 
-    let content_length = content_length.unwrap();
+    let page_views = page_views.unwrap();
 
-    if content_length < 100000 {
+    if page_views < 30000 {
         println!(
-            "Wikipedia article too short (https://en.wikipedia.org/wiki/{})",
-            wikipedia.replace(" ", "_")
+            "Not enough page views (https://en.wikipedia.org/wiki/{} = {})",
+            wikipedia.replace(" ", "_"),
+            page_views
         );
         return None;
     }
-
-    // Reject reasons
-    // date is older than xxx years (100,000?). Avoids things like species
 
     Some(Item {
         id,
@@ -284,13 +434,13 @@ fn process_item_json(
         wikipedia,
         num_sitelinks,
         instance_of,
-        content_length,
+        page_views,
     })
 }
 
 fn main() {
-    let mut count: isize = 0;
-    let mut seen_count: isize = 0;
+    let mut count: usize = 0;
+    let mut seen_count: usize = 0;
 
     // The order of this matters - they should be ranked in order of importance. The prop that is
     // found first is the prop that will be used for the item.
@@ -320,18 +470,39 @@ fn main() {
     let lines = read_lines("./processed.json").unwrap();
 
     let client = Client::builder().build().unwrap();
+    let mut id_label_map: HashMap<String, String> = HashMap::new();
+
+    let total: usize = 47711555;
+
+    let path = Path::new("items.json");
+    let display = path.display();
+
+    // Open a file in write-only mode, returns `io::Result<File>`
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why),
+        Ok(file) => file,
+    };
 
     for line in lines {
         seen_count += 1;
         if let Ok(item_json) = line {
-            if let Some(item) = process_item_json(&item_json, &date_props, &client) {
+            if let Some(item) =
+                process_item_json(&item_json, &date_props, &mut id_label_map, &client)
+            {
                 count += 1;
-                println!("\n---------------------------------------------\n");
-                println!("Count={} Seen={}", count, seen_count);
+                println!(
+                    "Count={}  Seen={}  Total={}  Percent={}  ID Map={}",
+                    count,
+                    seen_count,
+                    total,
+                    seen_count / total * 100,
+                    id_label_map.len(),
+                );
+                println!("");
                 println!("{}", &item.id);
                 println!("{}", &item.label);
                 println!("{}", &item.description);
-                if let Some(img) = item.image {
+                if let Some(img) = &item.image {
                     println!("https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/{}&width=300", urlencoding::encode(&img));
                 }
                 println!(
@@ -344,9 +515,17 @@ fn main() {
                     item.wikipedia.replace(" ", "_")
                 );
                 println!("num_sitelinks: {}", &item.num_sitelinks);
-                println!("content_length: {}", &item.content_length);
-                if let Some(instance_of) = item.instance_of {
+                println!("page_views: {}", &item.page_views);
+                if let Some(instance_of) = &item.instance_of {
                     dbg!(&instance_of);
+                }
+                println!("");
+
+                let json = serde_json::to_string(&item).unwrap();
+
+                match file.write(format!("{}\n", json).as_bytes()) {
+                    Err(why) => panic!("couldn't write to {}: {}", display, why),
+                    Ok(_) => (),
                 }
             }
         }
