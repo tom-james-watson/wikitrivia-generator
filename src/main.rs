@@ -28,7 +28,7 @@ struct Item {
     wikipedia: String,
     num_sitelinks: usize,
     page_views: usize,
-    instance_of: Option<Vec<String>>,
+    types: Vec<String>,
 }
 
 fn first_letter_to_uppper_case(s1: String) -> String {
@@ -376,6 +376,7 @@ fn process_item_json(
 
     let instance_of: Option<Vec<String>> = match v["claims"]["P31"].as_array() {
         Some(ids) => Some(
+            // thread 'main' panicked at 'range end index 1 out of range for slice of length 0', src/main.rs:379:13
             ids.into_iter()
                 .map(|id| return get_item_label(id.as_str().unwrap(), id_label_map, &client))
                 .filter(|label_option| return label_option.is_some())
@@ -389,12 +390,31 @@ fn process_item_json(
         if instance_of
             .clone()
             .unwrap()
-            .contains(&String::from("Q16521"))
+            .contains(&String::from("taxon"))
         {
             // println!("Ignore taxon instances");
             return None;
         }
     }
+
+    let occupations: Option<Vec<String>> = match v["claims"]["P106"].as_array() {
+        Some(ids) => Some(
+            ids.into_iter()
+                .map(|id| return get_item_label(id.as_str().unwrap(), id_label_map, &client))
+                .filter(|label_option| return label_option.is_some())
+                .map(|label_option| return label_option.unwrap())
+                .collect(),
+        ),
+        _ => None,
+    };
+
+    let types = if occupations.is_some() {
+        occupations.unwrap()
+    } else if instance_of.is_some() {
+        instance_of.unwrap()
+    } else {
+        vec![]
+    };
 
     let num_sitelinks = v["sitelinks"].as_object().unwrap().keys().len();
 
@@ -433,7 +453,7 @@ fn process_item_json(
         date_prop_id,
         wikipedia,
         num_sitelinks,
-        instance_of,
+        types,
         page_views,
     })
 }
@@ -516,9 +536,7 @@ fn main() {
                 );
                 println!("num_sitelinks: {}", &item.num_sitelinks);
                 println!("page_views: {}", &item.page_views);
-                if let Some(instance_of) = &item.instance_of {
-                    dbg!(&instance_of);
-                }
+                dbg!(&item.types);
                 println!("");
 
                 let json = serde_json::to_string(&item).unwrap();
