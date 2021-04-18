@@ -479,7 +479,7 @@ fn main() {
         ("P570", "date of death"),
         ("P582", "end time"),
         ("P580", "start time"),
-        ("P7124", "date of the latest one"),
+        ("P7125", "date of the latest one"),
         ("P7124", "date of the first one"),
     ]
     .iter()
