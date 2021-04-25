@@ -8,9 +8,10 @@ pub struct Item {
     pub description: String,
     pub id: String,
     pub image: String,
+    pub instance_of: Vec<String>,
     pub label: String,
+    pub occupations: Option<Vec<String>>,
     pub page_views: usize,
-    pub types: Vec<String>,
     pub wikipedia_title: String,
     pub year: i64,
 }

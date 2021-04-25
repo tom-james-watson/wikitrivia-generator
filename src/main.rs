@@ -42,10 +42,10 @@ fn main() {
         ("P1319", "earliest date"),
         ("P570", "date of death"),
         ("P569", "date of birth"),
-        ("P582", "end time"),
         ("P580", "start time"),
-        ("P7125", "date of the latest one"),
+        ("P582", "end time"),
         ("P7124", "date of the first one"),
+        ("P7125", "date of the latest one"),
     ]
     .iter()
     .cloned()
@@ -98,7 +98,10 @@ fn main() {
                     item.wikipedia_title.replace(" ", "_")
                 );
                 info!("page_views: {}", &item.page_views);
-                info!("types: {}", &item.types.join(","));
+                info!("instance_of: {}", &item.instance_of.join(","));
+                if let Some(occupations) = &item.occupations {
+                    info!("occupations: {}", &occupations.join(","));
+                }
                 info!("");
 
                 let json = serde_json::to_string(&item).unwrap();
