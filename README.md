@@ -26,6 +26,7 @@ P580 : start time
 P582 : end time
 P1249 : time of earliest written record
 P575 : time of discovery or invention
+P569 : date of birth
 P570 : date of death
 P571 : inception
 P576 : dissolved, abolished or demolished date
@@ -38,7 +39,6 @@ P6949 : announcement date
 P7124 : date of the first one
 P7589 : date of assent
 P8556 : extinction date
-
 
 ## Processing
 
