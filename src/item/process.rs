@@ -238,19 +238,7 @@ fn enough_sitelinks(num_sitelinks: usize) -> bool {
 }
 
 fn enough_page_views(year: i64, instance_of: &Vec<String>, page_views: usize) -> bool {
-    if instance_of.contains(&String::from("person")) {
-        if year > 1920 && page_views < 100000 {
-            return false;
-        } else if year > 1900 && page_views < 25000 {
-            return false;
-        } else if year > 1800 && page_views < 15000 {
-            return false;
-        } else if page_views < 10000 {
-            return false;
-        }
-    }
-
-    if instance_of.contains(&String::from("person")) {
+    if instance_of.contains(&String::from("human")) {
         if year > 1920 && page_views < 100000 {
             return false;
         } else if year > 1900 && page_views < 25000 {
