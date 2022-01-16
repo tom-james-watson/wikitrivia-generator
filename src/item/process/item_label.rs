@@ -53,8 +53,6 @@ pub fn get(
         thread::sleep(time::Duration::from_secs(30));
     }
 
-    // dbg!(&res.text());
-
     let json = res.json::<EntitiesResponse>();
 
     if let Err(err) = json {
@@ -63,22 +61,7 @@ pub fn get(
     }
 
     let json = json.unwrap();
-
-    let entity = json.entities.get(id);
-
-    if entity.is_none() {
-        warn!("Couldn't find entity in wikidata response");
-        return None;
-    }
-
-    let label = entity.unwrap().labels.get("en");
-
-    if label.is_none() {
-        warn!("Couldn't find en label in wikidata response");
-        return None;
-    }
-
-    let label = label.unwrap().value.to_string();
+    let label = json.entities.get(id)?.labels.get("en")?.value.to_string();
 
     id_label_map.insert(id.to_string(), label.to_string());
 
