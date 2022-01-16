@@ -2,6 +2,8 @@
 
 The scraper for https://wikitrivia.tomjwatson.com.
 
+The repository for the website can be found [here](https://github.com/tom-james-watson/wikitrivia).
+
 ## Development
 
 ### Requirements

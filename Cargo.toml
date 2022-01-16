@@ -1,5 +1,5 @@
 [package]
-name = "wiki-history-game"
+name = "wikitrivia"
 version = "0.1.0"
 authors = ["Tom Watson <tom@tomjwatson.com>"]
 edition = "2018"
