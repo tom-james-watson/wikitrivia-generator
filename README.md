@@ -1,26 +1,30 @@
-# Development
+# WikiTrivia Scaper
 
-## Requirements
+The scraper for https://wikitrivia.tomjwatson.com.
+
+## Development
+
+### Requirements
 
 ```
 sudo apt install pbzip2 jq
 sudo npm i -g wikibase-dump-filter
 ```
 
-## Running
+### Running
 
 ```
 cargo run
 ```
 
-# Notes
+## Notes
 
-## Important properties
+### Important properties
 
 P31 : instance of
 P18 : image
 
-## Date properties
+### Date properties
 
 P580 : start time
 P582 : end time
@@ -40,7 +44,7 @@ P7124 : date of the first one
 P7589 : date of assent
 P8556 : extinction date
 
-## Processing
+### Processing
 
 Get all items with date claims and keep a simplified version of the item:
 
@@ -52,6 +56,6 @@ pbzip2 -d latest-all.json.bz2 -c | wikibase-dump-filter --claim 'P580|P582|P1249
 pbzip2 -d latest-all.json.bz2 -c | wikibase-dump-filter --claim 'P1249|P575|P577' --simplify > processed2.json
 ```
 
-## Ranking
+### Ranking
 
 Rank them by fetching `contentlength` header of english wikipedia entry: `curl -I https://en.wikipedia.org/wiki/Paris`.
