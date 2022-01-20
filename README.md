@@ -1,6 +1,6 @@
-# WikiTrivia Scaper
+# WikiTrivia Generator
 
-The scraper for https://wikitrivia.tomjwatson.com.
+The code for generating cards for https://wikitrivia.tomjwatson.com.
 
 The repository for the website can be found [here](https://github.com/tom-james-watson/wikitrivia).
 
