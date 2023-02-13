@@ -50,7 +50,7 @@ pub fn get(wikipedia: &str, client: &Client) -> Option<Wikipedia> {
             "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=pageimages&titles={}",
             wikipedia.replace(" ", "_")
         ))
-        .header(USER_AGENT, "wiki-game analysis by wiki-game@tomjwatson.com")
+        .header(USER_AGENT, "<fill me out>")
         .send();
 
     if let Err(err) = res {

@@ -26,7 +26,7 @@ pub fn get(wikipedia: &str, client: &Client) -> Option<usize> {
             "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{}/monthly/2021010100/2021020100",
             wikipedia.replace(" ", "_")
         ))
-        .header(USER_AGENT, "wiki-game analysis by wiki-game@tomjwatson.com")
+        .header(USER_AGENT, "<fill me out>")
         .send();
 
     if let Err(err) = res {

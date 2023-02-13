@@ -38,7 +38,7 @@ pub fn get(
             "https://www.wikidata.org/w/api.php?action=wbgetentities&props=labels&ids={}&languages=en&format=json",
             id
         ))
-        .header(USER_AGENT, "wiki-game analysis by wiki-game@tomjwatson.com")
+        .header(USER_AGENT, "<fill me out>")
         .send();
 
     if let Err(err) = res {
